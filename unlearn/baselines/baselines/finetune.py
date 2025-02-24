@@ -33,7 +33,9 @@ def finetune(
         optim='adamw_torch',
         lr_scheduler_type='cosine',
         bf16=True,
-        report_to='none'        # Disable wandb
+        report_to='none',  # Disable wandb
+        save_strategy="epoch",  # Save checkpoint at the end of every epoch
+        save_total_limit=epochs  # Optionally limit the number of saved checkpoints
     )
 
     trainer = transformers.Trainer(
@@ -44,6 +46,6 @@ def finetune(
         data_collator=dataset.get_collate_fn()
     )
 
-    model.config.use_cache = False  # silence the warnings.
+    model.config.use_cache = False  # Silence the warnings.
     trainer.train()
     trainer.save_model(out_dir)

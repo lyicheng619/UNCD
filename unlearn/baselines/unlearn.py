@@ -96,7 +96,8 @@ def main():
             learning_rate=args.lr,
             max_len=args.max_len,
             tokenizer_dir=args.tokenizer_dir,
-            resume_from_checkpoint=args.resume_from_checkpoint
+            resume_from_checkpoint=args.resume_from_checkpoint,
+            n_step=args.n_step  # Pass the new argument
         )
 
     return
@@ -121,6 +122,9 @@ def get_args():
     parser.add_argument('--lr', type=float, default=1e-5, help="Learning rate for ga, gd, tv.")
     parser.add_argument('--epochs', type=int, default=5, help="Epochs for ga, gd, tv.")
     parser.add_argument('--alpha', type=float, default=1.0, help="Scaling coefficient for task vector (tv).")
+
+    # Number of saved checkpoints
+    parser.add_argument('--n_step', type=int, default=3, help="Number of checkpoints (including the final model).")
 
     if "--algo" in sys.argv and "rmu" in sys.argv:
         # RMU-specific arguments

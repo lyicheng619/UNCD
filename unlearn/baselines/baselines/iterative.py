@@ -19,7 +19,8 @@ def unlearn(
     learning_rate=1e-5,
     max_len: int = 4096,
     tokenizer_dir: str | None = None,
-    resume_from_checkpoint: bool = False
+    resume_from_checkpoint: bool = False,
+    n_step: int = 3  # Number of checkpoints (including the final model)
 ):
     if 'gd' in loss_type:
         assert retain_data_file is not None, "Retain data must be specified for grad_diff."
@@ -45,17 +46,23 @@ def unlearn(
     if device_count() == 0:
         raise ValueError("Device not detected!")
 
+    # Compute the total number of training steps
+    total_steps = (len(dataset) // per_device_batch_size) * epochs
+
+    # Compute checkpoint interval dynamically
+    save_steps = max(1, total_steps // (n_step - 1)) if n_step > 1 else total_steps
+
     training_args = transformers.TrainingArguments(
         output_dir=out_dir,
         per_device_train_batch_size=per_device_batch_size,
         learning_rate=learning_rate,
-        save_strategy='steps',  # Save every epoch
-        save_steps=360,
+        save_strategy='steps',
+        save_steps=save_steps,
         num_train_epochs=epochs,
         optim='adamw_torch',
         lr_scheduler_type='constant',
         bf16=True,
-        report_to='none'        # Disable wandb
+        report_to='none'  # Disable logging to external services
     )
 
     trainer = IterativeUnlearner(
@@ -67,10 +74,9 @@ def unlearn(
         data_collator=dataset.get_collate_fn(),
         loss_type=loss_type
     )
-    model.config.use_cache = False  # silence the warnings.
+    model.config.use_cache = False  # Silence the warnings.
     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     trainer.save_model(out_dir)
-
 
 
 class IterativeUnlearner(Trainer):
@@ -84,7 +90,7 @@ class IterativeUnlearner(Trainer):
                  **kwargs):
         self.loss_type = loss_type
         self.ref_model = ref_model
-        self.beta = beta    # Only relevant when `'po' in self.loss_type`
+        self.beta = beta  # Only relevant when `'po' in self.loss_type`
 
         if ref_model is not None:
             assert 'po' in self.loss_type or 'kl' in self.loss_type
@@ -92,11 +98,10 @@ class IterativeUnlearner(Trainer):
 
         super().__init__(*args, **kwargs)
 
-
     def compute_loss(self, model, x, return_outputs=False):
         """Source: https://github.com/licong-lin/negative-preference-optimization/blob/main/synthetic/mymodel.py
         """
-        
+
         ### 1. Run model ###
         x_f, x_r = x
         outputs_f = model(
@@ -153,17 +158,16 @@ class IterativeUnlearner(Trainer):
             kl_r = F.kl_div(
                 outputs_r.logits,
                 outputs_r_ref.logits,
-                reduction = 'batchmean',
-                log_target = True
+                reduction='batchmean',
+                log_target=True
             )
             loss += kl_r
 
         return (loss, outputs_f) if return_outputs else loss
 
-
     def prediction_step(self, model, x, prediction_loss_only: bool, ignore_keys=None):
         input_ids, labels, attention_mask = x
-        # forward pass
+        # Forward pass
         with torch.no_grad():
             outputs = model(input_ids, labels=labels, attention_mask=attention_mask)
             logits = outputs.logits
