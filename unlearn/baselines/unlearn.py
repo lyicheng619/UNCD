@@ -7,7 +7,7 @@ from transformers import AutoModelForCausalLM
 import torch
 
 # Import baselines
-from baselines import it_unlearn, tv_unlearn, finetune
+from muse_baseline import it_unlearn, tv_unlearn, finetune
 
 # Import RMU components from baselines/rmu
 from baselines.rmu.rmu import run_rmu  # Import run_rmu from baselines/rmu

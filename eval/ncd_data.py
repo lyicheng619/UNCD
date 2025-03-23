@@ -79,8 +79,8 @@ def create_qmatrix_and_map_knowledge_codes(data_domain_file_path, num_questions=
         for line in file:
             try:
                 entry = json.loads(line)
-                item_id = entry["item_id"]
-                knowledge_codes = entry["domain_id"]  # List of knowledge codes
+                item_id = entry["question_id"]
+                knowledge_codes = entry["domain_ids"]  # List of knowledge codes
 
                 # Generate binary vector for knowledge codes 1-14
                 qmatrix_row = [1 if kc in knowledge_codes else 0 for kc in range(1, 15)]
